@@ -103,6 +103,18 @@ npm run build
 npm start
 ```
 
+## GitHub Pages preview
+
+`.github/workflows/gh-pages.yml` publishes a **static, look-only preview** of the marketing pages
+(homepage, guides, legal, contact) to GitHub Pages on every push to `main`. It strips out
+`src/app/api`, `src/app/admin` and `src/proxy.ts` for that build only — GitHub Pages can't run
+server code, so checkout, webhooks, downloads and the admin dashboard don't exist there; the
+"Get [tier]" buttons render disabled with a "Preview only" label instead of posting to a
+non-existent API. This is for reviewing design/copy, not a functional deployment — the real site
+still needs a Node host (see "Deployment" above). First-time setup: repo Settings → Pages → Build
+and deployment → Source → **GitHub Actions** (only needed once; the workflow already targets that
+source).
+
 ## Project structure
 
 ```

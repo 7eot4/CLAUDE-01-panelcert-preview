@@ -8,6 +8,8 @@ declare global {
   }
 }
 
+const isStaticPreview = process.env.NEXT_PUBLIC_STATIC_PREVIEW === "1";
+
 export default function CheckoutForm({
   productSlug,
   tier,
@@ -19,6 +21,14 @@ export default function CheckoutForm({
   children: React.ReactNode;
   className?: string;
 }) {
+  if (isStaticPreview) {
+    return (
+      <div className={className} title="Checkout is disabled in this static preview — live on the deployed site.">
+        {children}
+      </div>
+    );
+  }
+
   return (
     <form
       action="/api/checkout"

@@ -1,0 +1,58 @@
+name: Deploy static preview to GitHub Pages
+
+# Publishes a STATIC PREVIEW of the marketing pages only (homepage, guides, legal, contact).
+# GitHub Pages cannot run server code, so the checkout API, the admin dashboard and the auth
+# middleware are stripped out of this build only — the real site (Vercel/any Node host) keeps
+# them and is unaffected by this workflow. See README.md "GitHub Pages preview" section.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Strip server-only routes (unsupported on static GitHub Pages)
+        run: rm -rf src/app/api src/app/admin src/proxy.ts
+
+      - name: Build static export
+        env:
+          GITHUB_PAGES_BUILD: "1"
+          GITHUB_PAGES_BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_STATIC_PREVIEW: "1"
+          NEXT_PUBLIC_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

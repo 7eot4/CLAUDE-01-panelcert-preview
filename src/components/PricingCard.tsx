@@ -1,6 +1,8 @@
 import type { ProductTier } from "@/types";
 import CheckoutForm from "@/components/CheckoutForm";
 
+const isStaticPreview = process.env.NEXT_PUBLIC_STATIC_PREVIEW === "1";
+
 export default function PricingCard({
   productSlug,
   tier,
@@ -38,17 +40,22 @@ export default function PricingCard({
       <CheckoutForm productSlug={productSlug} tier={tier} className="mt-6">
         <button
           type="submit"
+          disabled={isStaticPreview}
           className={`w-full rounded-md px-4 py-3 text-sm font-semibold transition ${
-            tier.mostPopular
-              ? "bg-brand-blue text-white hover:bg-blue-700"
-              : "bg-brand-navy text-white hover:bg-slate-800"
+            isStaticPreview
+              ? "cursor-not-allowed bg-slate-300 text-slate-500"
+              : tier.mostPopular
+                ? "bg-brand-blue text-white hover:bg-blue-700"
+                : "bg-brand-navy text-white hover:bg-slate-800"
           }`}
         >
-          Get {tier.name}
+          {isStaticPreview ? "Preview only" : `Get ${tier.name}`}
         </button>
       </CheckoutForm>
       <p className="mt-3 text-center text-xs text-brand-slate">
-        Secure checkout via Lemon Squeezy · 14-day money-back guarantee
+        {isStaticPreview
+          ? "Static GitHub Pages preview — checkout runs on the live deployment."
+          : "Secure checkout via Lemon Squeezy · 14-day money-back guarantee"}
       </p>
     </div>
   );
