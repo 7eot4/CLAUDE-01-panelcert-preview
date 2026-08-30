@@ -225,22 +225,51 @@ function signoffBlock(ws, startRow, lastCol) {
   return headerRow + 1 + roles.length;
 }
 
-function printSetup(ws, { titleRow, lastCol, lastRow, orientation = "landscape" }) {
+// These documents get printed and signed on site, so print scale is a real
+// quality attribute, not a nicety. A wide register squeezed onto one page width
+// lands around 50% scale — 11pt body text renders at roughly 5pt, which is not
+// signable. Wide sheets are therefore allowed two page-widths, with their
+// identifying column repeated on the second, rather than being shrunk to fit.
+function printSetup(ws, {
+  titleRow,
+  lastCol,
+  lastRow,
+  orientation = "landscape",
+  pagesWide = 1,
+  titleCols,
+  printArea,
+}) {
   ws.pageSetup = {
     orientation,
     fitToPage: true,
-    fitToWidth: 1,
+    fitToWidth: pagesWide,
     fitToHeight: 0,
-    horizontalCentered: true,
+    horizontalCentered: pagesWide === 1,
     margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
-    printArea: `A1:${colLetter(lastCol)}${lastRow}`,
+    printArea: printArea ?? `A1:${colLetter(lastCol)}${lastRow}`,
   };
   if (titleRow) {
     ws.pageSetup.printTitlesRow = `${titleRow}:${titleRow}`;
   }
+  if (titleCols) {
+    ws.pageSetup.printTitlesColumn = titleCols;
+  }
   ws.headerFooter = {
     oddFooter: `&L&9${BRAND.name} Commissioning Toolkit v${PRODUCT_VERSION}&C&9Page &P of &N&R&9&A`,
   };
+}
+
+// Wrapped text is the usual cause of a checklist printing with its last line
+// clipped. Estimate the tallest wrapped cell in the row and size to it.
+function wrappedRowHeight(entries) {
+  const lines = entries.reduce((max, [text, width, pointSize]) => {
+    if (!text) return max;
+    // ~1.1 characters per width unit for proportional fonts at 11pt; smaller
+    // type fits proportionally more per unit.
+    const charsPerLine = Math.max(8, Math.floor(width * (11 / pointSize) * 1.05));
+    return Math.max(max, Math.ceil(text.length / charsPerLine));
+  }, 1);
+  return Math.max(26, lines * 13 + 6);
 }
 
 function addValidation(ws, range, formula, prompt) {
@@ -256,6 +285,14 @@ function addValidation(ws, range, formula, prompt) {
       ? { showInputMessage: true, promptTitle: "How to fill this in", prompt }
       : {}),
   });
+}
+
+// Calculated cells get a distinct tint so it is obvious which columns work
+// themselves out and should not be typed over.
+const CALC_FILL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } };
+
+function markCalculated(cell) {
+  cell.fill = CALC_FILL;
 }
 
 function conditionalPassFail(ws, range) {
@@ -304,7 +341,7 @@ const CHECK_COLS = [
   "Punch #",
   "Checked by",
 ];
-const CHECK_WIDTHS = [5, 38, 44, 10, 14, 34, 16, 8, 16];
+const CHECK_WIDTHS = [4, 34, 38, 9, 12, 24, 13, 7, 13];
 
 function buildChecklistSheet(wb, { name, title, subtitle, sections }) {
   const ws = wb.addWorksheet(name, { properties: { defaultRowHeight: 15 } });
@@ -330,7 +367,10 @@ function buildChecklistSheet(wb, { name, title, subtitle, sections }) {
     section.items.forEach(([item, guidance]) => {
       itemNo += 1;
       const r = ws.getRow(row);
-      r.height = 28;
+      r.height = wrappedRowHeight([
+        [item, CHECK_WIDTHS[1], 11],
+        [guidance, CHECK_WIDTHS[2], 9],
+      ]);
       for (let c = 1; c <= lastCol; c++) styleBodyCell(r.getCell(c), striped);
       r.getCell(1).value = itemNo;
       r.getCell(1).alignment = { vertical: "top", horizontal: "center" };
@@ -575,7 +615,7 @@ function buildProjectDataSheet(wb) {
   });
   const lastCol = 6;
   sheetTitle(ws, "Project Data", "Fill this tab in once — every other sheet reads from it", lastCol);
-  setColumnWidths(ws, [26, 34, 18, 26, 22, 22]);
+  setColumnWidths(ws, [24, 32, 16, 22, 18, 20]);
 
   ws.getCell("A4").value = "Job identification";
   ws.getCell("A4").font = { bold: true, size: 11, color: { argb: `FF${BRAND.primary}` } };
@@ -669,7 +709,7 @@ function buildProjectDataSheet(wb) {
   const lastRow = row + revRows;
 
   ws.views = [{ state: "frozen", ySplit: 3 }];
-  printSetup(ws, { lastCol, lastRow, orientation: "portrait" });
+  printSetup(ws, { lastCol, lastRow, orientation: "landscape" });
   return { personnelHeader, equipHeader };
 }
 
@@ -879,7 +919,7 @@ function buildCableScheduleSheet(wb) {
   ];
   const lastCol = cols.length;
   sheetTitle(ws, "Cable & Termination Schedule", "Register every cable once — track it through to closeout", lastCol);
-  setColumnWidths(ws, [14, 26, 26, 20, 22, 14, 13, 11, 18, 13, 12, 13, 15, 15, 12, 30]);
+  setColumnWidths(ws, [12, 22, 22, 17, 18, 12, 11, 9, 15, 11, 11, 12, 13, 14, 11, 24]);
 
   let row = linkedProjectHeader(ws, 4, lastCol);
   const headerRow = row;
@@ -911,7 +951,13 @@ function buildCableScheduleSheet(wb) {
 
   ws.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: lastDataRow, column: lastCol } };
   ws.views = [{ state: "frozen", xSplit: 1, ySplit: headerRow, activeCell: `A${row}` }];
-  printSetup(ws, { titleRow: headerRow, lastCol, lastRow: summaryRow });
+  printSetup(ws, {
+    titleRow: headerRow,
+    lastCol,
+    lastRow: summaryRow,
+    pagesWide: 2,
+    titleCols: "A:A",
+  });
 }
 
 function buildInsulationLogSheet(wb) {
@@ -937,7 +983,7 @@ function buildInsulationLogSheet(wb) {
   ];
   const lastCol = cols.length;
   sheetTitle(ws, "Insulation Resistance (IR) Test Log", "Readings per circuit, judged against your project acceptance limit", lastCol);
-  setColumnWidths(ws, [14, 28, 16, 13, 12, 12, 12, 12, 12, 12, 12, 12, 11, 9, 16, 12, 30]);
+  setColumnWidths(ws, [13, 26, 15, 11, 10, 10, 10, 10, 10, 10, 11, 10, 10, 8, 15, 11, 24]);
 
   let row = linkedProjectHeader(ws, 4, lastCol);
 
@@ -982,6 +1028,7 @@ function buildInsulationLogSheet(wb) {
     lowest.numFmt = "0.00";
     lowest.alignment = { horizontal: "center", vertical: "middle" };
     lowest.font = { bold: true };
+    markCalculated(lowest);
 
     const verdict = ws.getCell(`L${r}`);
     verdict.value = {
@@ -989,9 +1036,16 @@ function buildInsulationLogSheet(wb) {
     };
     verdict.alignment = { horizontal: "center", vertical: "middle" };
     verdict.font = { bold: true };
+    markCalculated(verdict);
   }
 
   addValidation(ws, `C${firstDataRow}:C${lastDataRow}`, '"Pre-energization,Post-energization,Re-test,FAT,SAT"');
+  addValidation(
+    ws,
+    `D${firstDataRow}:D${lastDataRow}`,
+    '"250,500,1000,2500,5000"',
+    "Test voltage in volts. Use the voltage your project specification or the equipment manufacturer calls for — testing electronics at too high a voltage damages them."
+  );
   ws.getColumn(4).numFmt = "0";
   [5, 6, 7, 8, 9, 10].forEach((c) => {
     ws.getColumn(c).numFmt = "0.00";
@@ -1024,7 +1078,13 @@ function buildInsulationLogSheet(wb) {
 
   ws.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: lastDataRow, column: lastCol } };
   ws.views = [{ state: "frozen", xSplit: 2, ySplit: headerRow, activeCell: `A${firstDataRow}` }];
-  printSetup(ws, { titleRow: headerRow, lastCol, lastRow: signEnd });
+  printSetup(ws, {
+    titleRow: headerRow,
+    lastCol,
+    lastRow: signEnd,
+    pagesWide: 2,
+    titleCols: "A:B",
+  });
 
   return { verdictRange: `$L$${firstDataRow}:$L$${lastDataRow}` };
 }
@@ -1049,7 +1109,7 @@ function buildLotoSheet(wb) {
   ];
   const lastCol = cols.length;
   sheetTitle(ws, "LOTO (Lockout / Tagout) Tag Log", "Isolation register — every lock accounted for, applied through to removal", lastCol);
-  setColumnWidths(ws, [13, 14, 28, 24, 16, 22, 18, 18, 24, 22, 18, 18, 24, 26]);
+  setColumnWidths(ws, [11, 12, 24, 20, 14, 20, 15, 16, 20, 20, 15, 16, 20, 22]);
 
   let row = linkedProjectHeader(ws, 4, lastCol);
 
@@ -1121,7 +1181,13 @@ function buildLotoSheet(wb) {
 
   ws.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: lastDataRow, column: lastCol } };
   ws.views = [{ state: "frozen", xSplit: 1, ySplit: headerRow, activeCell: `A${firstDataRow}` }];
-  printSetup(ws, { titleRow: headerRow, lastCol, lastRow: signEnd });
+  printSetup(ws, {
+    titleRow: headerRow,
+    lastCol,
+    lastRow: signEnd,
+    pagesWide: 2,
+    titleCols: "A:A",
+  });
 }
 
 function buildPunchListSheet(wb) {
@@ -1145,7 +1211,7 @@ function buildPunchListSheet(wb) {
   ];
   const lastCol = cols.length;
   sheetTitle(ws, "Punch List / Snag List Tracker", "Open items from FAT and SAT through to closeout", lastCol);
-  setColumnWidths(ws, [6, 20, 22, 42, 24, 20, 16, 13, 13, 16, 38, 13, 11, 18, 14]);
+  setColumnWidths(ws, [5, 16, 20, 36, 22, 18, 14, 12, 12, 15, 32, 12, 10, 16, 12]);
 
   let row = linkedProjectHeader(ws, 4, lastCol);
 
@@ -1167,14 +1233,16 @@ function buildPunchListSheet(wb) {
   const lastDataRow = row + dataRows - 1;
 
   for (let r = firstDataRow; r <= lastDataRow; r++) {
-    ws.getCell(`A${r}`).value = { formula: `IF(D${r}="","",ROW()-${firstDataRow - 1})` };
-    ws.getCell(`A${r}`).alignment = { horizontal: "center", vertical: "top" };
+    const num = ws.getCell(`A${r}`);
+    num.value = { formula: `IF(D${r}="","",ROW()-${firstDataRow - 1})` };
+    num.alignment = { horizontal: "center", vertical: "top" };
+    markCalculated(num);
     // Age in days: counts to closure if closed, otherwise to today.
-    ws.getCell(`M${r}`).value = {
-      formula: `IF(H${r}="","",IF(L${r}="",TODAY()-H${r},L${r}-H${r}))`,
-    };
-    ws.getCell(`M${r}`).alignment = { horizontal: "center", vertical: "top" };
-    ws.getCell(`M${r}`).numFmt = "0";
+    const age = ws.getCell(`M${r}`);
+    age.value = { formula: `IF(H${r}="","",IF(L${r}="",TODAY()-H${r},L${r}-H${r}))` };
+    age.alignment = { horizontal: "center", vertical: "top" };
+    age.numFmt = "0";
+    markCalculated(age);
   }
 
   addValidation(ws, `B${firstDataRow}:B${lastDataRow}`, '"FAT,SAT,IR test,Cable check,Site walkdown,Client comment,Other"');
@@ -1241,7 +1309,13 @@ function buildPunchListSheet(wb) {
 
   ws.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: lastDataRow, column: lastCol } };
   ws.views = [{ state: "frozen", xSplit: 1, ySplit: headerRow, activeCell: `B${firstDataRow}` }];
-  printSetup(ws, { titleRow: headerRow, lastCol, lastRow: signEnd });
+  printSetup(ws, {
+    titleRow: headerRow,
+    lastCol,
+    lastRow: signEnd,
+    pagesWide: 2,
+    titleCols: "A:A",
+  });
 
   return {
     statusRange: `$J$${firstDataRow}:$J$${lastDataRow}`,
@@ -1265,9 +1339,9 @@ const LICENCE_TEXT = {
     "You may not resell, sublicense, publish or redistribute the blank template itself, in any format.",
   ],
   team: [
-    "Team licence: covers unlimited projects and unlimited named people within the purchasing company.",
+    "Team license: covers unlimited projects and unlimited named people within the purchasing company.",
     "You may store this workbook on company systems, adapt it to your house standard, and issue completed documents to clients.",
-    "You may not resell, sublicense, publish or redistribute the blank template itself, or supply it to a company outside the licence holder.",
+    "You may not resell, sublicense, publish or redistribute the blank template itself, or supply it to a company outside the license holder.",
     "Priority support: reply to your order confirmation email and your message goes to the front of the queue.",
   ],
 };
@@ -1276,7 +1350,7 @@ function buildReadMeSheet(wb, { includedSheets, tier, keys }) {
   const ws = wb.addWorksheet("Read Me", {
     properties: { tabColor: { argb: `FF${BRAND.accent}` } },
   });
-  setColumnWidths(ws, [4, 44, 62, 14, 14, 14]);
+  setColumnWidths(ws, [3, 40, 62, 12, 12, 12]);
 
   ws.mergeCells("A1:F1");
   const title = ws.getCell("A1");
@@ -1288,7 +1362,7 @@ function buildReadMeSheet(wb, { includedSheets, tier, keys }) {
 
   ws.mergeCells("A2:F2");
   const sub = ws.getCell("A2");
-  const tierName = tier === "team" ? "Team Licence" : tier === "starter" ? "Starter" : "Complete";
+  const tierName = tier === "team" ? "Team License" : tier === "starter" ? "Starter" : "Complete";
   sub.value = `${tierName} edition · version ${PRODUCT_VERSION} · © ${PRODUCT_YEAR} ${BRAND.name}`;
   sub.font = { italic: true, size: 10, color: { argb: `FF${BRAND.muted}` } };
   sub.alignment = { vertical: "middle", indent: 1 };
@@ -1349,17 +1423,28 @@ function buildReadMeSheet(wb, { includedSheets, tier, keys }) {
   steps.forEach(([label, text], i) => line(`${i + 1}. ${label}`, text));
   spacer();
 
+  // Clickable so the Read Me works as a contents page rather than a list of names.
+  // Deliberately a HYPERLINK() formula rather than a cell hyperlink: ExcelJS
+  // writes cell hyperlinks as external relationships even when the target is an
+  // internal sheet reference, which Excel can flag as a damaged file on open.
   heading("What is in this workbook");
-  includedSheets.forEach((name) => {
-    line(`•  ${name}`, "");
+  includedSheets.forEach(({ sheet, label }) => {
+    ws.getRow(row).height = 16;
+    const cell = ws.getCell(`B${row}`);
+    cell.value = { formula: `HYPERLINK("#'${sheet}'!A1","▸  ${sheet}")` };
+    cell.font = { size: 10, bold: true, color: { argb: `FF${BRAND.accent}` }, underline: true };
+    ws.getCell(`C${row}`).value = label;
+    ws.getCell(`C${row}`).font = { size: 10, color: { argb: "FF334155" } };
+    ws.getCell(`C${row}`).alignment = { vertical: "top", wrapText: true };
+    row += 1;
   });
   spacer();
 
   heading("Things worth knowing");
   line("One workbook per job.", "Save a copy per project rather than adding tabs to a master file. It keeps the audit trail clean and lets you archive the job intact.");
   line("Dropdowns are already set up.", "Result and status columns are validated lists. You can still type your own wording if a job needs it — you will just get a warning prompt, not a locked cell.");
-  line("Sheets are print-ready.", "Landscape, scaled to page width, header row repeated on every printed page, and a page-number footer. Print to PDF for issue to the client.");
-  line("Calculated cells are formulas.", "Summary rows, and the calculated columns on the test tabs, work themselves out. Overwrite them only if you mean to.");
+  line("Sheets are print-ready.", "Landscape, with the header row repeated on every page and a page-number footer. The wide registers print across two page-widths with their ID column repeated, rather than being shrunk to unreadable type. Print to PDF for issue to the client.");
+  line("Tinted cells calculate themselves.", "The pale blue columns — lowest reading, verdict, item number, days open — and the summary rows are formulas. Typing over one replaces the formula, so do it only if you mean to.");
   line("Rows can be added.", "Insert rows inside an existing table rather than typing under the last row, so formulas, validation and formatting carry over.");
   line("Need more capacity?", "Copy the last data row and paste down. Validation, borders and formulas come with it.");
   line("Built and tested in Excel.", "It opens in LibreOffice Calc and Google Sheets, but conditional colouring and some print settings render differently there. Issue the client a PDF if that matters.");
@@ -1384,7 +1469,7 @@ function buildReadMeSheet(wb, { includedSheets, tier, keys }) {
   );
   spacer();
 
-  heading("Licence");
+  heading("License");
   LICENCE_TEXT[tier].forEach((text) => line(`•  ${text}`, ""));
   spacer();
 
@@ -1393,16 +1478,19 @@ function buildReadMeSheet(wb, { includedSheets, tier, keys }) {
   line("Version", `${PRODUCT_VERSION} — check your order email for update notifications.`);
 
   const lastRow = row;
+  // Only columns A–C carry content; printing the full width would shrink the
+  // type for no reason.
   ws.pageSetup = {
     orientation: "portrait",
     fitToPage: true,
     fitToWidth: 1,
     fitToHeight: 0,
     margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
-    printArea: `A1:F${lastRow}`,
+    printArea: `A1:C${lastRow}`,
   };
   ws.headerFooter = { oddFooter: `&L&9${BRAND.name} Commissioning Toolkit v${PRODUCT_VERSION}&R&9Page &P of &N` };
   ws.views = [{ state: "frozen", ySplit: 2, showGridLines: false }];
+  return lastRow;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1414,14 +1502,32 @@ function buildReadMeSheet(wb, { includedSheets, tier, keys }) {
 const countItems = (sections) => sections.reduce((n, s) => n + s.items.length, 0);
 
 const SHEET_LABELS = {
-  project: "Project Data — job details, personnel, test equipment, revision history",
-  fat: `FAT Checklist — ${countItems(FAT_SECTIONS)} checks across ${FAT_SECTIONS.length} sections, with method guidance`,
-  sat: `SAT Checklist — ${countItems(SAT_SECTIONS)} checks across ${SAT_SECTIONS.length} sections, with method guidance`,
-  report: "Commissioning Report — handover summary with live results from the other tabs",
-  cable: "Cable & Termination Schedule — 80-row register with progress totals",
-  ir: "IR Test Log — 60 circuits, automatic verdict against your acceptance limit",
-  loto: "LOTO Tag Log — 45 isolations, applied through to removal",
-  punch: "Punch List — 70 items, severity, ageing and overdue highlighting",
+  project: { sheet: PD.sheet, label: "Job details, personnel, test equipment and calibration, revision history" },
+  fat: {
+    sheet: "FAT Checklist",
+    label: `${countItems(FAT_SECTIONS)} checks across ${FAT_SECTIONS.length} sections, each with a method note`,
+  },
+  sat: {
+    sheet: "SAT Checklist",
+    label: `${countItems(SAT_SECTIONS)} checks across ${SAT_SECTIONS.length} sections, each with a method note`,
+  },
+  report: { sheet: "Commissioning Report", label: "Handover summary, reading live results from the other tabs" },
+  cable: { sheet: "Cable Schedule", label: "80-row register with termination and test progress totals" },
+  ir: { sheet: "IR Test Log", label: "60 circuits, verdict calculated against your acceptance limit" },
+  loto: { sheet: "LOTO Tag Log", label: "45 isolations tracked from applied through to removed" },
+  punch: { sheet: "Punch List", label: "70 items with severity, ageing in days and overdue highlighting" },
+};
+
+// Tab colours group the workbook: dark for reference, blue for the acceptance
+// documents, slate for the working registers.
+const TAB_COLOURS = {
+  "FAT Checklist": BRAND.accent,
+  "SAT Checklist": BRAND.accent,
+  "Commissioning Report": BRAND.accent,
+  "Cable Schedule": "94A3B8",
+  "IR Test Log": "94A3B8",
+  "LOTO Tag Log": "94A3B8",
+  "Punch List": "94A3B8",
 };
 
 async function buildWorkbook(keys, filename, tier) {
@@ -1470,6 +1576,17 @@ async function buildWorkbook(keys, filename, tier) {
   if (keys.includes("loto")) buildLotoSheet(wb);
   if (keys.includes("punch")) ranges.punch = buildPunchListSheet(wb);
   if (keys.includes("report")) buildCommissioningReportSheet(wb, keys, ranges);
+
+  Object.entries(TAB_COLOURS).forEach(([name, colour]) => {
+    const sheet = wb.getWorksheet(name);
+    if (sheet) sheet.properties.tabColor = { argb: `FF${colour}` };
+  });
+
+  // Every table is fully bordered, so the background grid only adds noise — off
+  // screen it reads as a document rather than a spreadsheet.
+  wb.eachSheet((sheet) => {
+    sheet.views = (sheet.views || [{}]).map((view) => ({ ...view, showGridLines: false }));
+  });
 
   // Present the report immediately after the checklists it summarises.
   const desiredOrder = [
