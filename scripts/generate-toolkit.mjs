@@ -1272,7 +1272,7 @@ const LICENCE_TEXT = {
   ],
 };
 
-function buildReadMeSheet(wb, { includedSheets, tier }) {
+function buildReadMeSheet(wb, { includedSheets, tier, keys }) {
   const ws = wb.addWorksheet("Read Me", {
     properties: { tabColor: { argb: `FF${BRAND.accent}` } },
   });
@@ -1317,12 +1317,36 @@ function buildReadMeSheet(wb, { includedSheets, tier }) {
     row += 1;
   };
 
+  // Steps are built from the sheets this edition actually ships, so a Starter
+  // buyer is never told to use a tab they did not receive.
   heading("Start here");
-  line("1. Open the Project Data tab and fill it in.", "Project name, client, job number and revision are entered once and appear automatically at the top of every other sheet.");
-  line("2. Record your test instruments on the same tab.", "Serial numbers and calibration dates. A reading with no traceable instrument behind it is not evidence.");
-  line("3. Work through the checklists.", "The Result column is a dropdown: Pass, Fail or N/A. Anything you mark Fail should get a line on the Punch List tab.");
-  line("4. Log readings as you take them.", "The IR Test Log works out the lowest reading and the pass/fail verdict for you, against the acceptance limit you set at the top of that tab.");
-  line("5. Close out and sign.", "The Commissioning Report pulls live counts from the other tabs, so the summary cannot drift out of step with the detail behind it.");
+  const steps = [
+    [
+      "Open the Project Data tab and fill it in.",
+      "Project name, client, job number and revision are entered once and appear automatically at the top of every other sheet.",
+    ],
+    [
+      "Record your test instruments on the same tab.",
+      "Serial numbers and calibration dates. A reading with no traceable instrument behind it is not evidence.",
+    ],
+    [
+      "Work through the checklists.",
+      keys.includes("punch")
+        ? "The Result column is a dropdown: Pass, Fail or N/A. Anything you mark Fail should get a line on the Punch List tab."
+        : "The Result column is a dropdown: Pass, Fail or N/A. Record what failed and why in the notes column, and carry it into your own defect register.",
+    ],
+  ];
+  if (keys.includes("ir")) {
+    steps.push([
+      "Log readings as you take them.",
+      "The IR Test Log works out the lowest reading and the pass/fail verdict for you, against the acceptance limit you set at the top of that tab.",
+    ]);
+  }
+  steps.push([
+    "Close out and sign.",
+    "The Commissioning Report pulls live counts from the other tabs, so the summary cannot drift out of step with the detail behind it. Every document ends with a three-role sign-off block.",
+  ]);
+  steps.forEach(([label, text], i) => line(`${i + 1}. ${label}`, text));
   spacer();
 
   heading("What is in this workbook");
@@ -1333,11 +1357,12 @@ function buildReadMeSheet(wb, { includedSheets, tier }) {
 
   heading("Things worth knowing");
   line("One workbook per job.", "Save a copy per project rather than adding tabs to a master file. It keeps the audit trail clean and lets you archive the job intact.");
-  line("Dropdowns are already set up.", "Result, severity, status and energy-source columns are validated lists. You can still type your own wording if a job needs it — you will just get a warning prompt.");
+  line("Dropdowns are already set up.", "Result and status columns are validated lists. You can still type your own wording if a job needs it — you will just get a warning prompt, not a locked cell.");
   line("Sheets are print-ready.", "Landscape, scaled to page width, header row repeated on every printed page, and a page-number footer. Print to PDF for issue to the client.");
-  line("Coloured cells are calculated.", "Lowest reading, verdict, days open and the summary rows are formulas. Overwrite them only if you mean to.");
+  line("Calculated cells are formulas.", "Summary rows, and the calculated columns on the test tabs, work themselves out. Overwrite them only if you mean to.");
   line("Rows can be added.", "Insert rows inside an existing table rather than typing under the last row, so formulas, validation and formatting carry over.");
   line("Need more capacity?", "Copy the last data row and paste down. Validation, borders and formulas come with it.");
+  line("Built and tested in Excel.", "It opens in LibreOffice Calc and Google Sheets, but conditional colouring and some print settings render differently there. Issue the client a PDF if that matters.");
   spacer();
 
   heading("Scope and limitations — please read");
@@ -1414,6 +1439,7 @@ async function buildWorkbook(keys, filename, tier) {
   buildReadMeSheet(wb, {
     includedSheets: ["project", ...keys].map((k) => SHEET_LABELS[k]),
     tier,
+    keys,
   });
   buildProjectDataSheet(wb);
 
