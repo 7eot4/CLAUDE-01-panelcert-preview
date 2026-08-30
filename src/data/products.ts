@@ -3,37 +3,37 @@ import type { Product } from "@/types";
 const FAT = {
   name: "Factory Acceptance Test (FAT) Checklist",
   description:
-    "Panel-by-panel FAT sign-off: visual inspection, wiring continuity, I/O verification, functional test, punch items, sign-off block.",
+    "45 checks across 8 sections — documentation, enclosure, power circuits, earthing, I/O and configuration, functional testing, safety systems, dispatch. Every line carries a short method note, so it reads as a procedure rather than a list of headings.",
 };
 const SAT = {
   name: "Site Acceptance Test (SAT) Checklist",
   description:
-    "On-site commissioning checklist: power-up sequence, loop checks, interlocks, safety circuits, performance test, client sign-off block.",
+    "45 checks across 9 sections — site readiness, installation, earthing, energization, loop checks, interlocks and network, safety systems, performance, handover. Same method notes throughout.",
 };
 const COMMISSIONING_REPORT = {
   name: "Commissioning Test Report",
   description:
-    "Formal handover document summarizing test results, deviations, corrective actions and final acceptance status.",
+    "Handover document that pulls live pass/fail counts from the checklist and test tabs, so the summary can't drift out of step with the evidence behind it. Acceptance status, limitations, and a three-role sign-off.",
 };
 const CABLE_SCHEDULE = {
   name: "Cable & Termination Schedule",
   description:
-    "Cable ID, origin/destination, core count, gland/termination status, and test result tracking in one register.",
+    "80-row register: ID, route, type, cores, voltage rating, length, glanding, termination, continuity and IR cross-reference — with running totals for terminated and tested cables.",
 };
 const INSULATION_LOG = {
   name: "Insulation Resistance (IR) Test Log",
   description:
-    "Pre- and post-energization IR readings per circuit against your pass/fail threshold, with test instrument record.",
+    "60 circuits, all six phase/earth combinations. You set the acceptance limit once; the sheet finds the lowest reading per circuit and returns the pass/fail verdict itself. Ambient temperature and humidity recorded alongside.",
 };
 const LOTO_LOG = {
   name: "LOTO (Lockout/Tagout) Tag Log",
   description:
-    "Isolation point register: tag number, device, applied by, verified by, removal sign-off — audit-ready.",
+    "45 isolations tracked from applied to removed, with energy source, isolation method, zero-energy verification and second-person check. Any lock still applied is highlighted automatically.",
 };
 const PUNCH_LIST = {
   name: "Punch List / Snag List Tracker",
   description:
-    "Open-item tracker with severity, responsible party, target date and closeout sign-off, sortable by area or panel.",
+    "70 items with severity (A/B/C), responsible party, automatic ageing in days, and overdue highlighting. Severity-A items still open are flagged straight onto the commissioning report.",
 };
 
 export const panelcertToolkit: Product = {
@@ -54,7 +54,8 @@ export const panelcertToolkit: Product = {
       documents: [FAT, SAT, COMMISSIONING_REPORT],
       features: [
         "3 core documents (FAT, SAT, Commissioning Report)",
-        "Single active project",
+        "Project details entered once, carried across every sheet",
+        "Dropdowns, print setup and sign-off blocks already built",
         "Editable Excel (.xlsx), works offline",
         "Lifetime access to this version",
       ],
@@ -79,7 +80,9 @@ export const panelcertToolkit: Product = {
       ],
       features: [
         "All 7 documents in one workbook",
-        "Single active project",
+        "Project details entered once, carried across every sheet",
+        "IR verdicts, punch-list ageing and report totals calculated for you",
+        "Print-ready: repeating headers, page numbers, sign-off blocks",
         "Editable Excel (.xlsx), works offline",
         "Free updates to this product line",
       ],
@@ -104,11 +107,12 @@ export const panelcertToolkit: Product = {
       features: [
         "All 7 documents in one workbook",
         "Unlimited projects, unlimited team members",
-        "Editable Excel (.xlsx), works offline",
+        "Company licence wording built into the workbook",
+        "Adapt it to your house standard and reissue internally",
         "Priority email support",
         "Free updates to this product line",
       ],
-      fileKey: "panelcert-complete.xlsx",
+      fileKey: "panelcert-team.xlsx",
     },
   ],
 };

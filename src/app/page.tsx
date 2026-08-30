@@ -11,7 +11,12 @@ const faqItems = [
   {
     question: "What exactly do I get?",
     answer:
-      "One .xlsx workbook (Excel, works in Google Sheets and LibreOffice too) with a separate tab for each document, plus a Read Me tab. No app to install, no account needed — it's yours the moment it's delivered.",
+      "One .xlsx workbook with a tab per document, plus a Read Me and a Project Data tab. It arrives finished, not as a shell you have to build out: the dropdowns are wired, the IR log works out its own pass/fail verdict against the limit you set, the punch list ages itself in days, and every sheet is already set up to print in landscape with a repeating header row. Built and tested in Excel; it opens in LibreOffice and Google Sheets, though some formatting renders differently there.",
+  },
+  {
+    question: "Do I have to retype the project details on every sheet?",
+    answer:
+      "No. You fill in the Project Data tab once — project, client, contractor, site, job number, revision — and every other sheet reads from it. Change the revision late in the job and it updates everywhere. That tab also holds your personnel list, your test instrument records (serial numbers and calibration dates) and a revision history block.",
   },
   {
     question: "Is this specific to one industry standard or code?",
@@ -102,6 +107,10 @@ export default function Home() {
                   <li key={d.name}>• {d.name}</li>
                 ))}
               </ul>
+              <p className="mt-3 text-slate-400">
+                + Project Data tab — job details, personnel, test instruments and calibration dates,
+                revision history. Entered once, read by every sheet above.
+              </p>
             </div>
           </div>
         </div>
@@ -125,8 +134,9 @@ export default function Home() {
             Seven documents. One workbook. Every job.
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-brand-slate">
-            Not screenshots of a demo — this is the actual product, generated as a real, editable
-            .xlsx file you can open right now.
+            Plus a Project Data tab that feeds all of them, and a Read Me. Dropdowns, calculated
+            verdicts, sign-off blocks and print setup are already done — you fill it in, you don&apos;t
+            finish building it.
           </p>
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             {completeTier.documents.map((doc) => (
